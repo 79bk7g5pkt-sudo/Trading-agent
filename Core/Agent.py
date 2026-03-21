@@ -118,15 +118,24 @@ Rules: Max 10% risk. BUY only if confidence>=65. SELL only if confidence>=60. Re
         decision["mode"] = self.mode
         return decision
 
-    def execute_decision(self, decision, market_data):
-        action = decision.get("action","HOLD")
-        symbol = decision.get("symbol","BTC/USDT")
-        price = market_data.get("price",0)
-        if action == "HOLD":
-            return {"status": "no_trade"}
-        if self.mode == "paper":
-            return self._paper_trade(decision, price, symbol)
-        return {"status": "live_not_implemented"}
+    def _live_trade(self, decision, price, symbol):
+    from binance.client import Client
+    import os
+    client = Client(os.environ.get("BINANCE_API_KEY"), os.environ.get("BINANCE_SECRET_KEY"))
+    action = decision["action"]
+    size_pct = decision.get("position_size_pct", 5) / 100
+    balance = float(client.get_asset_balance(asset="USDT")["free"])
+    amount = balance * size_pct
+    sym = symbol.replace("/", "")
+    if action == "BUY":
+        order = client.order_market_buy(symbol=sym, quoteOrderQty=round(amount, 2))
+    elif action == "SELL":
+        asset = sym.replace("USDT", "")
+        qty = float(client.get_asset_balance(asset=asset)["free"])
+        sell_qty = round(qty * size_pct, 6)
+        order = client.order_market_sell(symbol=sym, quantity=sell_qty)
+    return {"status": "executed_live", "order": order}
+
 
     def _paper_trade(self, decision, price, symbol):
         action = decision["action"]
