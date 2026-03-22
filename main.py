@@ -168,6 +168,7 @@ Bot is running 24/7 on your VPS""")
     elif text == "/portfolio":
         if agent:
             p = agent.get_portfolio_summary()
-            send_telegram(f"""📊 <b>PAPER PORTFOLIO</b>
+                        send_telegram("PAPER PORTFOLIO - USDT: " + str(round(p["usdt_balance"],2)) + " Trades: " + str(p["total_trades"]))
+
 USDT: ${p['usdt_balance']:,.2f}
 Positions: {json​​​​​​​​​​​​​​​​
