@@ -2,9 +2,57 @@ import asyncio
 import argparse
 import json
 import time
+import requests
+import os
 from datetime import datetime
 from core.agent import ClaudeTradingAgent
 from data.binance_feed import fetch_market_data
+
+def send_telegram(message):
+    token = os.environ.get("TELEGRAM_TOKEN")
+    chat_id = os.environ.get("TELEGRAM_CHAT_ID")
+    if not token or not chat_id:
+        return
+    try:
+        requests.post(
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            json={"chat_id": chat_id, "text": message, "parse_mode": "HTML"},
+            timeout=10
+        )
+    except Exception as e:
+        print(f"Telegram error: {e}")
+
+def format_telegram_message(decision, market_data):
+    action = decision.get("action", "HOLD")
+    emoji = "🟢" if action == "BUY" else "🔴" if action == "SELL" else "⏸"
+    price = market_data.get("price", 0)
+    symbol = market_data.get("symbol", "BTC/USDT")
+    confidence = decision.get("confidence", 0)
+    stop_loss = decision.get("stop_loss", 0)
+    take_profit = decision.get("take_profit", 0)
+    risk = decision.get("risk_level", "N/A")
+    reasoning = decision.get("reasoning", "N/A")
+    whale = decision.get("whale_impact", "N/A")
+    news = decision.get("news_impact", "N/A")
+    rsi = market_data.get("indicators", {}).get("rsi", "N/A")
+    mode = decision.get("mode", "paper").upper()
+
+    return f"""🤖 <b>CLAUDE TRADING BOT</b> [{mode}]
+━━━━━━━━━━━━━━━━━━
+{emoji} <b>ACTION: {action}</b>
+💰 {symbol}: ${price:,.2f}
+📊 Confidence: {confidence}%
+⚠️ Risk: {risk}
+━━━━━━━━━━━━━━━━━━
+🎯 Take Profit: ${take_profit:,}
+🛑 Stop Loss: ${stop_loss:,}
+📈 RSI: {rsi}
+🐋 Whale: {whale}
+📰 News: {news}
+━━━━━━━━━━━━━━━━━━
+💭 <i>{reasoning[:200]}</i>
+━━━━━━━━━━━━━━━━━━
+🕐 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"""
 
 def print_decision(decision):
     action = decision.get("action","HOLD")
@@ -44,6 +92,8 @@ async def run(symbol="BTCUSDT", interval="1h", mode="paper", max_cycles=None):
     intervals = {"1m":60,"5m":300,"15m":900,"1h":3600,"4h":14400,"1d":86400}
     wait = intervals.get(interval, 3600)
     cycle = 0
+    msg = f"Trading bot started\nSymbol: {symbol}\nMode: {mode.upper()}\nInterval: {interval}"
+    send_telegram(msg)
     print(f"Starting: {symbol} | {interval} | {mode.upper()} mode")
     while True:
         cycle += 1
@@ -57,14 +107,21 @@ async def run(symbol="BTCUSDT", interval="1h", mode="paper", max_cycles=None):
             print("Consulting Claude AI...")
             decision = await agent.analyze_and_decide(market_data)
             print_decision(decision)
+            tg_msg = format_telegram_message(decision, market_data)
+            send_telegram(tg_msg)
             result = agent.execute_decision(decision, market_data)
             print(f"Trade result: {result}")
+            if result.get("status") == "executed_live":
+                trade_msg = f"TRADE EXECUTED\nAction: {decision['action']}\nSymbol: {symbol}\nPrice: ${market_data['price']:,.2f}"
+                send_telegram(trade_msg)
             save_state(agent, decision, market_data)
         except KeyboardInterrupt:
             print("Stopped by user")
+            send_telegram("Bot stopped by user")
             break
         except Exception as e:
             print(f"Error: {e}")
+            send_telegram(f"Bot error: {e}")
         if not (max_cycles and cycle >= max_cycles):
             print(f"Next check in {wait//60} minutes...")
             time.sleep(wait)
