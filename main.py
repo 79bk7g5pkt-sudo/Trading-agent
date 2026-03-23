@@ -31,7 +31,6 @@ def send_telegram(message):
 
 def format_decision(decision, market_data):
     action = decision.get("action", "HOLD")
-    emoji = "🟢" if action == "BUY" else "🔴" if action == "SELL" else "⏸"
     price = market_data.get("price", 0)
     symbol = market_data.get("symbol", "BTC/USDT")
     confidence = decision.get("confidence", 0)
@@ -43,22 +42,20 @@ def format_decision(decision, market_data):
     news = decision.get("news_impact", "N/A")
     rsi = market_data.get("indicators", {}).get("rsi", "N/A")
     mode = decision.get("mode", "paper").upper()
-    return f"""🤖 <b>CLAUDE TRADING BOT</b> [{mode}]
-━━━━━━━━━━━━━━━━━━
-{emoji} <b>ACTION: {action}</b>
-💰 {symbol}: ${price:,.2f}
-📊 Confidence: {confidence}%
-⚠️ Risk: {risk}
-━━━━━━━━━━━━━━━━━━
-🎯 Take Profit: ${take_profit:,}
-🛑 Stop Loss: ${stop_loss:,}
-📈 RSI: {rsi}
-🐋 Whale: {whale}
-📰 News: {news}
-━━━━━━━━━━━━━━━━━━
-💭 <i>{str(reasoning)[:200]}</i>
-━━━━━━━━━━━━━━━━━━
-🕐 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"""
+    return (
+        "CLAUDE TRADING BOT [" + mode + "]\n"
+        "ACTION: " + action + "\n"
+        + symbol + ": $" + str(round(price, 2)) + "\n"
+        "Confidence: " + str(confidence) + "%\n"
+        "Risk: " + str(risk) + "\n"
+        "Take Profit: $" + str(take_profit) + "\n"
+        "Stop Loss: $" + str(stop_loss) + "\n"
+        "RSI: " + str(rsi) + "\n"
+        "Whale: " + str(whale) + "\n"
+        "News: " + str(news) + "\n"
+        "Reason: " + str(reasoning)[:200] + "\n"
+        "Time: " + datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    )
 
 def get_balance():
     try:
@@ -71,46 +68,45 @@ def get_balance():
         btc = float(client.get_asset_balance(asset="BTC")["free"])
         btc_price = last_market_data.get("price", 0)
         total = usdt + (btc * btc_price)
-        return f"""💼 <b>BINANCE BALANCE</b>
-━━━━━━━━━━━━━━━━━━
-💵 USDT: ${usdt:,.2f}
-₿ BTC: {btc:.6f}
-💰 BTC Value: ${btc*btc_price:,.2f}
-━━━━━━━━━━━━━━━━━━
-📊 Total: ${total:,.2f}"""
+        return (
+            "BINANCE BALANCE\n"
+            "USDT: $" + str(round(usdt, 2)) + "\n"
+            "BTC: " + str(round(btc, 6)) + "\n"
+            "BTC Value: $" + str(round(btc * btc_price, 2)) + "\n"
+            "Total: $" + str(round(total, 2))
+        )
     except Exception as e:
-        return f"Balance error: {e}"
+        return "Balance error: " + str(e)
 
 def handle_command(text):
     global running, current_mode, agent
     text = text.strip().lower()
 
-    if text == "/start" or text == "/help":
-        send_telegram("""🤖 <b>CLAUDE TRADING BOT COMMANDS</b>
-━━━━━━━━━━━━━━━━━━
-/status - Current market analysis
-/balance - Check Binance balance
-/buy - Force BUY order now
-/sell - Force SELL order now
-/stop - Stop the bot
-/start_bot - Resume the bot
-/mode_live - Switch to live trading
-/mode_paper - Switch to paper trading
-/portfolio - View paper portfolio
-━━━━━━━━━━━━━━━━━━
-Bot is running 24/7 on your VPS""")
+    if text in ["/start", "/help"]:
+        send_telegram(
+            "CLAUDE TRADING BOT COMMANDS\n"
+            "/status - Current market analysis\n"
+            "/balance - Check Binance balance\n"
+            "/buy - Force BUY order now\n"
+            "/sell - Force SELL order now\n"
+            "/stop - Stop the bot\n"
+            "/start_bot - Resume the bot\n"
+            "/mode_live - Switch to live trading\n"
+            "/mode_paper - Switch to paper trading\n"
+            "/portfolio - View paper portfolio"
+        )
 
     elif text == "/status":
         if last_decision and last_market_data:
             send_telegram(format_decision(last_decision, last_market_data))
         else:
-            send_telegram("No analysis yet — waiting for first cycle")
+            send_telegram("No analysis yet - waiting for first cycle")
 
     elif text == "/balance":
         send_telegram(get_balance())
 
     elif text == "/buy":
-        send_telegram("⚡ Forcing BUY order...")
+        send_telegram("Forcing BUY order...")
         try:
             forced = {
                 "action": "BUY",
@@ -123,12 +119,12 @@ Bot is running 24/7 on your VPS""")
                 "symbol": last_market_data.get("symbol", "BTC/USDT")
             }
             result = agent.execute_decision(forced, last_market_data)
-            send_telegram(f"BUY executed: {json.dumps(result)}")
+            send_telegram("BUY executed: " + str(result))
         except Exception as e:
-            send_telegram(f"BUY error: {e}")
+            send_telegram("BUY error: " + str(e))
 
     elif text == "/sell":
-        send_telegram("⚡ Forcing SELL order...")
+        send_telegram("Forcing SELL order...")
         try:
             forced = {
                 "action": "SELL",
@@ -141,9 +137,9 @@ Bot is running 24/7 on your VPS""")
                 "symbol": last_market_data.get("symbol", "BTC/USDT")
             }
             result = agent.execute_decision(forced, last_market_data)
-            send_telegram(f"SELL executed: {json.dumps(result)}")
+            send_telegram("SELL executed: " + str(result))
         except Exception as e:
-            send_telegram(f"SELL error: {e}")
+            send_telegram("SELL error: " + str(e))
 
     elif text == "/stop":
         running = False
@@ -168,4 +164,114 @@ Bot is running 24/7 on your VPS""")
     elif text == "/portfolio":
         if agent:
             p = agent.get_portfolio_summary()
-                send_telegram("PAPER PORTFOLIO - USDT: " + str(round(p["usdt_balance"],2)))
+            send_telegram(
+                "PAPER PORTFOLIO\n"
+                "USDT: $" + str(round(p["usdt_balance"], 2)) + "\n"
+                "Positions: " + str(p["positions"]) + "\n"
+                "Total Trades: " + str(p["total_trades"])
+            )
+        else:
+            send_telegram("Agent not started yet")
+
+def telegram_listener():
+    last_update_id = 0
+    while True:
+        try:
+            r = requests.get(
+                f"https://api.telegram.org/bot{TOKEN}/getUpdates",
+                params={"offset": last_update_id + 1, "timeout": 30},
+                timeout=35
+            )
+            updates = r.json().get("result", [])
+            for update in updates:
+                last_update_id = update["update_id"]
+                msg = update.get("message", {})
+                chat_id = str(msg.get("chat", {}).get("id", ""))
+                text = msg.get("text", "")
+                if chat_id == str(CHAT_ID) and text:
+                    print(f"Telegram command: {text}")
+                    handle_command(text)
+        except Exception as e:
+            print(f"Listener error: {e}")
+            time.sleep(5)
+
+def save_state(decision, market_data):
+    state = {
+        "last_updated": datetime.now().isoformat(),
+        "market": {
+            "symbol": market_data.get("symbol"),
+            "price": market_data.get("price"),
+            "indicators": market_data.get("indicators"),
+            "sentiment": market_data.get("sentiment"),
+            "orderbook": market_data.get("orderbook"),
+            "cmc": market_data.get("cmc", {}),
+            "whales": market_data.get("whales", {})
+        },
+        "last_decision": decision,
+        "portfolio": agent.get_portfolio_summary() if agent else {}
+    }
+    with open("agent_state.json", "w") as f:
+        json.dump(state, f, indent=2)
+
+async def run(symbol="BTCUSDT", interval="15m", mode="paper", max_cycles=None):
+    global agent, running, current_mode, last_market_data, last_decision
+    current_mode = mode
+    agent = ClaudeTradingAgent(mode=mode)
+    intervals = {"1m": 60, "5m": 300, "15m": 900, "1h": 3600, "4h": 14400}
+    wait = intervals.get(interval, 900)
+    listener = threading.Thread(target=telegram_listener, daemon=True)
+    listener.start()
+    send_telegram(
+        "Bot started\n"
+        "Symbol: " + symbol + "\n"
+        "Mode: " + mode.upper() + "\n"
+        "Interval: " + interval + "\n"
+        "Send /help for commands"
+    )
+    cycle = 0
+    while running:
+        cycle += 1
+        if max_cycles and cycle > max_cycles:
+            break
+        print(f"\n[Cycle {cycle}] {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        try:
+            market_data = fetch_market_data(symbol, interval)
+            last_market_data = market_data
+            price = market_data["price"]
+            rsi = market_data["indicators"]["rsi"]
+            print(f"Price: ${price:,.4f} | RSI: {rsi}")
+            print("Consulting Claude AI...")
+            decision = await agent.analyze_and_decide(market_data)
+            last_decision = decision
+            action = decision.get("action", "HOLD")
+            confidence = decision.get("confidence", 0)
+            print(f"Decision: {action} | Confidence: {confidence}%")
+            send_telegram(format_decision(decision, market_data))
+            result = agent.execute_decision(decision, market_data)
+            print(f"Result: {result}")
+            if result.get("status") == "executed_live":
+                send_telegram(
+                    "TRADE PLACED on Binance\n"
+                    + action + " " + symbol + " @ $" + str(round(price, 2))
+                )
+            save_state(decision, market_data)
+        except Exception as e:
+            print(f"Error: {e}")
+            send_telegram("Error: " + str(e))
+        if running and not (max_cycles and cycle >= max_cycles):
+            print(f"Next check in {wait // 60} min...")
+            time.sleep(wait)
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--symbol", default="BTCUSDT")
+    parser.add_argument("--interval", default="15m")
+    parser.add_argument("--live", action="store_true")
+    parser.add_argument("--cycles", type=int, default=None)
+    args = parser.parse_args()
+    mode = "live" if args.live else "paper"
+    print("Starting in " + mode.upper() + " mode...")
+    asyncio.run(run(args.symbol, args.interval, mode, args.cycles))
+
+if __name__ == "__main__":
+    main()
