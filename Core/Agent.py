@@ -119,23 +119,34 @@ Rules: Max 10% risk. BUY only if confidence>=65. SELL only if confidence>=60. Re
         return decision
 
     def _live_trade(self, decision, price, symbol):
-    from binance.client import Client
-    import os
-    client = Client(os.environ.get("BINANCE_API_KEY"), os.environ.get("BINANCE_SECRET_KEY"))
-    action = decision["action"]
-    size_pct = decision.get("position_size_pct", 5) / 100
-    balance = float(client.get_asset_balance(asset="USDT")["free"])
-    amount = balance * size_pct
-    sym = symbol.replace("/", "")
-    if action == "BUY":
-        order = client.order_market_buy(symbol=sym, quoteOrderQty=round(amount, 2))
-    elif action == "SELL":
-        asset = sym.replace("USDT", "")
-        qty = float(client.get_asset_balance(asset=asset)["free"])
-        sell_qty = round(qty * size_pct, 6)
-        order = client.order_market_sell(symbol=sym, quantity=sell_qty)
-    return {"status": "executed_live", "order": order}
-
+    try:
+        from binance.client import Client
+        import os
+        client = Client(
+            os.environ.get("BINANCE_API_KEY"),
+            os.environ.get("BINANCE_SECRET_KEY") )
+        action = decision["action"]
+        size_pct = decision.get("position_size_pct", 5) / 100
+        sym = symbol.replace("/", "")
+        usdt_balance = float(client.get_asset_balance(asset="USDT")["free"])
+        self.portfolio["USDT"] = usdt_balance
+        if action == "BUY":
+            amount = round(usdt_balance * size_pct, 2)
+            if amount < 10:
+                return {"status": "skipped", "reason": "Balance too low: $"+str(usdt_balance)}
+            order = client.order_market_buy(symbol=sym, quoteOrderQty=amount)
+            return {"status": "executed_live", "action": "BUY", "amount": amount, "order_id": order["orderId"]}
+        elif action == "SELL":
+            asset = sym.replace("USDT", "")
+            qty = float(client.get_asset_balance(asset=asset)["free"])
+            sell_qty = round(qty * size_pct, 6)
+            if sell_qty <= 0:
+                return {"status": "skipped", "reason": "No "+asset+" to sell"}
+            order = client.order_market_sell(symbol=sym, quantity=sell_qty)
+            return {"status": "executed_live", "action": "SELL", "qty": sell_qty, "order_id": order["orderId"]}
+        return {"status": "no_trade"}
+    except Exception as e:
+        return {"status": "error", "reason": str(e)}
 
     def _paper_trade(self, decision, price, symbol):
         action = decision["action"]
