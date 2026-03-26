@@ -124,7 +124,8 @@ Rules: Max 10% risk. BUY only if confidence>=65. SELL only if confidence>=60. Re
         import os
         client = Client(
             os.environ.get("BINANCE_API_KEY"),
-            os.environ.get("BINANCE_SECRET_KEY") )
+            os.environ.get("BINANCE_SECRET_KEY")
+        )
         action = decision["action"]
         size_pct = decision.get("position_size_pct", 5) / 100
         sym = symbol.replace("/", "")
@@ -133,7 +134,7 @@ Rules: Max 10% risk. BUY only if confidence>=65. SELL only if confidence>=60. Re
         if action == "BUY":
             amount = round(usdt_balance * size_pct, 2)
             if amount < 10:
-                return {"status": "skipped", "reason": "Balance too low: $"+str(usdt_balance)}
+                return {"status": "skipped", "reason": "Balance too low"}
             order = client.order_market_buy(symbol=sym, quoteOrderQty=amount)
             return {"status": "executed_live", "action": "BUY", "amount": amount, "order_id": order["orderId"]}
         elif action == "SELL":
@@ -147,6 +148,7 @@ Rules: Max 10% risk. BUY only if confidence>=65. SELL only if confidence>=60. Re
         return {"status": "no_trade"}
     except Exception as e:
         return {"status": "error", "reason": str(e)}
+
 
     def _paper_trade(self, decision, price, symbol):
         action = decision["action"]
