@@ -185,3 +185,30 @@ Rules: Max 10% risk. BUY only if confidence>=65. SELL only if confidence>=60. Re
 
     def get_portfolio_summary(self):
         return {"mode": self.mode, "usdt_balance": self.portfolio["USDT"], "positions": self.portfolio["positions"], "total_trades": len(self.trade_log), "trade_log": self.trade_log[-10:]}
+    def _live_trade(self, decision, price, symbol):
+        try:
+            from binance.client import Client
+            import os
+            client = Client(os.environ.get('BINANCE_API_KEY'), os.environ.get('BINANCE_SECRET_KEY'))
+            action = decision['action']
+            size_pct = decision.get('position_size_pct', 5) / 100
+            sym = symbol.replace('/', '')
+            usdt = float(client.get_asset_balance(asset='USDT')['free'])
+            self.portfolio['USDT'] = usdt
+            if action == 'BUY':
+                amount = round(usdt * size_pct, 2)
+                if amount < 10:
+                    return {'status': 'skipped', 'reason': 'Low balance'}
+                order = client.order_market_buy(symbol=sym, quoteOrderQty=amount)
+                return {'status': 'executed_live', 'action': 'BUY', 'amount': amount, 'order_id': order['orderId']}
+            elif action == 'SELL':
+                asset = sym.replace('USDT', '')
+                qty = float(client.get_asset_balance(asset=asset)['free'])
+                sell_qty = round(qty * size_pct, 6)
+                if sell_qty <= 0:
+                    return {'status': 'skipped', 'reason': 'No '+asset+' to sell'}
+                order = client.order_market_sell(symbol=sym, quantity=sell_qty)
+                return {'status': 'executed_live', 'action': 'SELL', 'qty': sell_qty, 'order_id': order['orderId']}
+            return {'status': 'no_trade'}
+        except Exception as e:
+            return {'status': 'error', 'reason': str(e)}
