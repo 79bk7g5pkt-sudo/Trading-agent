@@ -118,43 +118,87 @@ Rules: Max 10% risk. BUY only if confidence>=65. SELL only if confidence>=60. Re
         decision["mode"] = self.mode
         return decision
 
-    def _live_trade(self, decision, price, symbol):
-    try:
-        from binance.client import Client
-        import os
-        client = Client(
-            os.environ.get("BINANCE_API_KEY"),
-            os.environ.get("BINANCE_SECRET_KEY")
-        )
-        action = decision["action"]
-        size_pct = decision.get("position_size_pct", 5) / 100
-        sym = symbol.replace("/", "")
-        usdt_balance = float(client.get_asset_balance(asset="USDT")["free"])
-        self.portfolio["USDT"] = usdt_balance
-        if action == "BUY":
-            amount = round(usdt_balance * size_pct, 2)
-            if amount < 10:
-                return {"status": "skipped", "reason": "Balance too low"}
-            order = client.order_market_buy(symbol=sym, quoteOrderQty=amount)
-            return {"status": "executed_live", "action": "BUY", "amount": amount, "order_id": order["orderId"]}
-        elif action == "SELL":
-    asset = sym.replace("USDT", "")
-    qty = float(client.get_asset_balance(asset=asset)["free"])
-    if qty <= 0:
-        return {"status": "skipped", "reason": "No "+asset+" to sell"}
-    info = client.get_symbol_info(sym)
-    lot = next(f for f in info["filters"] if f["filterType"]=="LOT_SIZE")
-    step = float(lot["stepSize"])
-    import math
-    sell_qty = math.floor(qty / step) * step
-    sell_qty = round(sell_qty, 8)
-    if sell_qty <= 0:
-        return {"status": "skipped", "reason": "Qty too small"}
-    order = client.order_market_sell(symbol=sym, quantity=sell_qty)
-    return {"status": "executed_live", "action": "SELL", "qty": sell_qty, "order_id": order["orderId"]}
+        def _live_trade(self, decision, price, symbol):
+        try:
+            from binance.client import Client
+            import os
+            import math
+            client = Client(os.environ.get("BINANCE_API_KEY"), os.environ.get("BINANCE_SECRET_KEY"))
+            action = decision["action"]
+            size_pct = decision.get("position_size_pct", 5) / 100
+            sym = symbol.replace("/", "")
+            usdt = float(client.get_asset_balance(asset="USDT")["free"])
+            self.portfolio["USDT"] = usdt
 
-    except Exception as e:
-        return {"status": "error", "reason": str(e)}
+            if action == "BUY":
+                amount = round(usdt * size_pct, 2)
+                if amount < 10:
+                    return {"status": "skipped", "reason": "Balance too low"}
+                buy_order = client.order_market_buy(symbol=sym, quoteOrderQty=amount)
+                filled_qty = float(buy_order["executedQty"])
+                filled_price = float(buy_order["cummulativeQuoteQty"]) / filled_qty
+                info = client.get_symbol_info(sym)
+                lot = next(f for f in info["filters"] if f["filterType"] == "LOT_SIZE")
+                price_filter = next(f for f in info["filters"] if f["filterType"] == "PRICE_FILTER")
+                step = float(lot["stepSize"])
+                tick = float(price_filter["tickSize"])
+                sell_qty = float("{:.8f}".format(math.floor(filled_qty / step) * step))
+                take_profit = decision.get("take_profit", filled_price * 1.05)
+                stop_loss = decision.get("stop_loss", filled_price * 0.97)
+                stop_limit = stop_loss * 0.99
+                def round_price(p, tick):
+                    decimals = len(str(tick).rstrip("0").split(".")[-1])
+                    return round(round(p / tick) * tick, decimals)
+                tp_price = round_price(take_profit, tick)
+                sl_price = round_price(stop_loss, tick)
+                sl_limit = round_price(stop_limit, tick)
+                try:
+                    oco = client.order_oco_sell(
+                        symbol=sym,
+                        quantity=sell_qty,
+                        price=str(tp_price),
+                        stopPrice=str(sl_price),
+                        stopLimitPrice=str(sl_limit),
+                        stopLimitTimeInForce="GTC"
+                    )
+                    return {
+                        "status": "executed_live",
+                        "action": "BUY",
+                        "amount": amount,
+                        "buy_order_id": buy_order["orderId"],
+                        "oco_order_id": oco["orderListId"],
+                        "take_profit": tp_price,
+                        "stop_loss": sl_price,
+                        "qty": sell_qty
+                    }
+                except Exception as oco_error:
+                    return {
+                        "status": "executed_live",
+                        "action": "BUY",
+                        "amount": amount,
+                        "buy_order_id": buy_order["orderId"],
+                        "oco_error": str(oco_error),
+                        "note": "Buy placed but OCO failed"
+                    }
+
+            elif action == "SELL":
+                asset = sym.replace("USDT", "")
+                qty = float(client.get_asset_balance(asset=asset)["free"])
+                if qty <= 0:
+                    return {"status": "skipped", "reason": "No "+asset+" to sell"}
+                info = client.get_symbol_info(sym)
+                lot = next(f for f in info["filters"] if f["filterType"] == "LOT_SIZE")
+                step = float(lot["stepSize"])
+                sell_qty = float("{:.8f}".format(math.floor(qty / step) * step))
+                if sell_qty <= 0:
+                    return {"status": "skipped", "reason": "Qty too small"}
+                order = client.order_market_sell(symbol=sym, quantity=sell_qty)
+                return {"status": "executed_live", "action": "SELL", "qty": sell_qty, "order_id": order["orderId"]}
+
+            return {"status": "no_trade"}
+        except Exception as e:
+            return {"status": "error", "reason": str(e)}
+
 
 
     def _paper_trade(self, decision, price, symbol):
