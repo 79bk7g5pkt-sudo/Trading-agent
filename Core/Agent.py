@@ -138,14 +138,21 @@ Rules: Max 10% risk. BUY only if confidence>=65. SELL only if confidence>=60. Re
             order = client.order_market_buy(symbol=sym, quoteOrderQty=amount)
             return {"status": "executed_live", "action": "BUY", "amount": amount, "order_id": order["orderId"]}
         elif action == "SELL":
-            asset = sym.replace("USDT", "")
-            qty = float(client.get_asset_balance(asset=asset)["free"])
-            sell_qty = round(qty * size_pct, 6)
-            if sell_qty <= 0:
-                return {"status": "skipped", "reason": "No "+asset+" to sell"}
-            order = client.order_market_sell(symbol=sym, quantity=sell_qty)
-            return {"status": "executed_live", "action": "SELL", "qty": sell_qty, "order_id": order["orderId"]}
-        return {"status": "no_trade"}
+    asset = sym.replace("USDT", "")
+    qty = float(client.get_asset_balance(asset=asset)["free"])
+    if qty <= 0:
+        return {"status": "skipped", "reason": "No "+asset+" to sell"}
+    info = client.get_symbol_info(sym)
+    lot = next(f for f in info["filters"] if f["filterType"]=="LOT_SIZE")
+    step = float(lot["stepSize"])
+    import math
+    sell_qty = math.floor(qty / step) * step
+    sell_qty = round(sell_qty, 8)
+    if sell_qty <= 0:
+        return {"status": "skipped", "reason": "Qty too small"}
+    order = client.order_market_sell(symbol=sym, quantity=sell_qty)
+    return {"status": "executed_live", "action": "SELL", "qty": sell_qty, "order_id": order["orderId"]}
+
     except Exception as e:
         return {"status": "error", "reason": str(e)}
 
