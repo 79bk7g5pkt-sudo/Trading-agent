@@ -219,8 +219,10 @@ async def run(symbol="BTCUSDT", interval="15m", mode="paper", max_cycles=None):
     agent = ClaudeTradingAgent(mode=mode)
     intervals = {"1m": 60, "5m": 300, "15m": 900, "1h": 3600, "4h": 14400}
     wait = intervals.get(interval, 900)
+    if not max_cycles:
     listener = threading.Thread(target=telegram_listener, daemon=True)
     listener.start()
+
     send_telegram(
         "Bot started\n"
         "Symbol: " + symbol + "\n"
