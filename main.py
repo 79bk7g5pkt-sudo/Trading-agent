@@ -161,7 +161,7 @@ def handle_command(text):
             agent.set_mode("paper")
         send_telegram("Switched to PAPER mode")
 
-    elif text == "/portfolio":
+        elif text == "/portfolio":
         if agent:
             p = agent.get_portfolio_summary()
             send_telegram(
@@ -169,28 +169,25 @@ def handle_command(text):
                 "USDT: $" + str(round(p["usdt_balance"], 2)) + "\n"
                 "Positions: " + str(p["positions"]) + "\n"
                 "Total Trades: " + str(p["total_trades"])
-                elif text == "/pnl":
-    try:
-        from binance.client import Client
-        c = Client(os.environ.get("BINANCE_API_KEY"), os.environ.get("BINANCE_SECRET_KEY"))
-        eth = c.get_my_trades(symbol="ETHUSDT", limit=50)
-        btc = c.get_my_trades(symbol="BTCUSDT", limit=50)
-        xrp = c.get_my_trades(symbol="XRPUSDT", limit=50)
-        all_trades = eth + btc + xrp
-        bought = sum(float(t["quoteQty"]) for t in all_trades if t["isBuyer"])
-        sold = sum(float(t["quoteQty"]) for t in all_trades if not t["isBuyer"])
-        fees = sum(float(t["commission"]) for t in all_trades if t["commissionAsset"] == "USDT")
-        pnl = sold - bought - fees
-        send_telegram(
-            "PNL REPORT\n"
-            "Total Bought: $" + str(round(bought, 2)) + "\n"
-            "Total Sold: $" + str(round(sold, 2)) + "\n"
-            "Fees: $" + str(round(fees, 2)) + "\n"
-            "Net PnL: $" + str(round(pnl, 2)) + "\n"
-            "Return: " + str(round(pnl/bought*100, 2)) + "%"
-        )
-    except Exception as e:
-        send_telegram("PnL error: " + str(e))
+            )
+        else:
+            send_telegram("Agent not started yet")
+
+    elif text == "/pnl":
+        try:
+            from binance.client import Client
+            c = Client(os.environ.get("BINANCE_API_KEY"), os.environ.get("BINANCE_SECRET_KEY"))
+            eth = c.get_my_trades(symbol="ETHUSDT", limit=50)
+            btc = c.get_my_trades(symbol="BTCUSDT", limit=50)
+            xrp = c.get_my_trades(symbol="XRPUSDT", limit=50)
+            all_trades = eth + btc + xrp
+            bought = sum(float(t["quoteQty"]) for t in all_trades if t["isBuyer"])
+            sold = sum(float(t["quoteQty"]) for t in all_trades if not t["isBuyer"])
+            fees = sum(float(t["commission"]) for t in all_trades if t["commissionAsset"] == "USDT")
+            pnl = sold - bought - fees
+            send_telegram("PNL REPORT\nBought: $" + str(round(bought,2)) + "\nSold: $" + str(round(sold,2)) + "\nFees: $" + str(round(fees,2)) + "\nNet PnL: $" + str(round(pnl,2)) + "\nReturn: " + str(round(pnl/bought*100,2)) + "%")
+        except Exception as e:
+            send_telegram("PnL error: " + str(e))
 
             )
         else:
