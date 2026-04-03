@@ -5,6 +5,7 @@ import json
 from datetime import datetime
 from binance.client import Client
 import math
+import numpy as np
 
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
@@ -19,8 +20,7 @@ HALAL_COINS = [
     "DGB","ARDR","STEEM","HIVE",
     "UNI","SUSHI","CRV","SNX","YFI","COMP","MKR","AAVE","1INCH",
     "MATIC","OP","ARB","BOBA","CELR",
-    "SLP","ALICE","TLM","HERO","SKILL","TOWER",
-    "FET","NMR","AGIX","RNDR",
+    "SLP","ALICE","TLM","FET","NMR","AGIX","RNDR",
     "WAN","ARPA","CTSI","BAND","API3","UMA","BAL","PERP"
 ]
 
@@ -35,6 +35,28 @@ def send_telegram(message):
         )
     except Exception as e:
         print(f"Telegram error: {e}")
+
+def get_rsi(symbol, period=14):
+    try:
+        client = Client(
+            os.environ.get("BINANCE_API_KEY"),
+            os.environ.get("BINANCE_SECRET_KEY")
+        )
+        klines = client.get_klines(symbol=symbol+"USDT", interval="1h", limit=period+1)
+        closes = [float(k[4]) for k in klines]
+        deltas = [closes[i+1]-closes[i] for i in range(len(closes)-1)]
+        gains = [d if d > 0 else 0 for d in deltas]
+        losses = [-d if d < 0 else 0 for d in deltas]
+        avg_gain = sum(gains) / period
+        avg_loss = sum(losses) / period
+        if avg_loss == 0:
+            return 100
+        rs = avg_gain / avg_loss
+        rsi = 100 - (100 / (1 + rs))
+        return round(rsi, 2)
+    except Exception as e:
+        print(f"RSI error for {symbol}: {e}")
+        return 50
 
 def get_whale_coins():
     print("Scanning CoinGecko for whale activity...")
@@ -62,9 +84,9 @@ def get_whale_coins():
                 continue
             volume_to_mcap = volume / market_cap
             if (volume_to_mcap > 0.15 and
-    0 < price_change < 8 and
-    volume > 10000000 and
-    symbol in HALAL_COINS):
+                0 < price_change < 8 and
+                volume > 10000000 and
+                symbol in HALAL_COINS):
                 whale_candidates.append({
                     "symbol": symbol,
                     "name": name,
@@ -75,7 +97,7 @@ def get_whale_coins():
                     "volume_to_mcap": round(volume_to_mcap, 3)
                 })
         whale_candidates.sort(key=lambda x: x["volume_to_mcap"], reverse=True)
-        return whale_candidates[:5]
+        return whale_candidates[:10]
     except Exception as e:
         print(f"CoinGecko error: {e}")
         return []
@@ -91,6 +113,24 @@ def check_binance_available(symbol):
     except:
         return False
 
+def filter_by_rsi(candidates):
+    print("Fetching RSI from Binance...")
+    filtered = []
+    for coin in candidates:
+        symbol = coin["symbol"]
+        if not check_binance_available(symbol):
+            print(f"{symbol} not on Binance - skipping")
+            continue
+        rsi = get_rsi(symbol)
+        coin["rsi"] = rsi
+        print(f"{symbol} RSI: {rsi}")
+        if rsi < 55:
+            filtered.append(coin)
+        else:
+            print(f"{symbol} RSI too high ({rsi}) - skipping")
+    filtered.sort(key=lambda x: x["rsi"])
+    return filtered
+
 async def analyze_whale_coin(coin):
     try:
         import anthropic
@@ -103,16 +143,17 @@ Price: ${coin['price']}
 Market Cap: ${coin['market_cap']:,.0f}
 Volume/MCap Ratio: {coin['volume_to_mcap']} (high = whale activity)
 24h Price Change: {coin['price_change_24h']}%
+RSI: {coin.get('rsi', 50)} (below 55 = not overbought yet)
 
-High volume relative to market cap suggests large players are accumulating.
-Should we BUY this coin expecting significant increase?
+Whales are accumulating quietly - price has not pumped yet.
+Should we BUY expecting significant increase?
 
 Return ONLY JSON:
 {{
     "action": "BUY" or "SKIP",
     "confidence": 0-100,
     "reasoning": "brief explanation",
-    "take_profit_pct": 10-100,
+    "take_profit_pct": 10-50,
     "stop_loss_pct": 5-15,
     "risk_level": "LOW/MEDIUM/HIGH"
 }}"""
@@ -179,9 +220,16 @@ async def main():
         send_telegram("No halal whale activity detected today.")
         return
 
-    report = "WHALE ACTIVITY REPORT\nTop halal coins with unusual volume:\n\n"
-    for coin in coins:
-        report += coin["symbol"] + ": +" + str(round(coin["price_change_24h"],1)) + "% | Vol/MCap: " + str(coin["volume_to_mcap"]) + "\n"
+    print(f"Found {len(coins)} candidates - checking RSI...")
+    coins = filter_by_rsi(coins)
+
+    if not coins:
+        send_telegram("No coins passed RSI filter today - all overbought.")
+        return
+
+    report = "WHALE ACTIVITY REPORT\nHalal coins with whale activity + RSI ok:\n\n"
+    for coin in coins[:5]:
+        report += coin["symbol"] + ": +" + str(round(coin["price_change_24h"],1)) + "% | RSI: " + str(coin.get("rsi","?")) + " | Vol/MCap: " + str(coin["volume_to_mcap"]) + "\n"
     send_telegram(report)
 
     client = Client(os.environ.get("BINANCE_API_KEY"), os.environ.get("BINANCE_SECRET_KEY"))
@@ -194,11 +242,7 @@ async def main():
 
     coin = coins[0]
     symbol = coin["symbol"]
-    print(f"Analyzing top halal whale coin: {symbol}")
-
-    if not check_binance_available(symbol):
-        send_telegram(symbol + " not available on Binance - skipping")
-        return
+    print(f"Analyzing top halal whale coin: {symbol} (RSI: {coin.get('rsi')})")
 
     analysis = await analyze_whale_coin(coin)
     action = analysis.get("action", "SKIP")
@@ -208,6 +252,7 @@ async def main():
     sl_pct = analysis.get("stop_loss_pct", 10)
 
     msg = "WHALE COIN ANALYSIS: " + symbol + "\n"
+    msg += "RSI: " + str(coin.get("rsi", "?")) + "\n"
     msg += "Action: " + action + "\n"
     msg += "Confidence: " + str(confidence) + "%\n"
     msg += "Take Profit: +" + str(tp_pct) + "%\n"
@@ -223,7 +268,7 @@ async def main():
                 "WHALE BUY EXECUTED\n"
                 "Coin: " + symbol + "\n"
                 "Amount: $" + str(trade_amount) + "\n"
-                "Buy Price: $" + str(round(result["buy_price"],4)) + "\n"
+                "Buy Price: $" + str(round(result["buy_price"],6)) + "\n"
                 "Take Profit: $" + str(result["take_profit"]) + "\n"
                 "Stop Loss: $" + str(result["stop_loss"]) + "\n"
                 "OCO: " + result["oco_status"]
