@@ -202,7 +202,7 @@ async def main():
         msg += "Reason: " + reasoning[:200]
         send_telegram(msg)
         
-        if action == "BUY" and confidence >= 65:
+        if action == "BUY" and confidence >= 60:
             print(f"Buying {symbol}...")
             result = place_buy_with_oco(symbol, trade_amount, tp_pct, sl_pct)
             if result["status"] == "success":
