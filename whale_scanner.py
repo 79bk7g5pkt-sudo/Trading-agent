@@ -186,7 +186,7 @@ async def main():
 
     client = Client(os.environ.get("BINANCE_API_KEY"), os.environ.get("BINANCE_SECRET_KEY"))
     usdt = float(client.get_asset_balance(asset="USDT")["free"])
-    trade_amount = round(usdt * 0.10, 2)
+    trade_amount = round(usdt * 0.05, 2)
 
     if trade_amount < 10:
         send_telegram("USDT balance too low for whale trades.")
