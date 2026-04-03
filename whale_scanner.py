@@ -188,25 +188,40 @@ def place_buy_with_oco(symbol, usdt_amount, take_profit_pct, stop_loss_pct):
         tp_price = round(round(filled_price * (1 + take_profit_pct/100) / tick) * tick, decimals)
         sl_price = round(round(filled_price * (1 - stop_loss_pct/100) / tick) * tick, decimals)
         sl_limit = round(round(sl_price * 0.99 / tick) * tick, decimals)
-        oco = client.create_oco_order(
-            symbol=symbol+"USDT",
-            side="SELL",
-            quantity="{:.8f}".format(sell_qty),
-            aboveType="LIMIT_MAKER",
-            abovePrice="{:.{}f}".format(tp_price, decimals),
-            belowType="STOP_LOSS_LIMIT",
-            belowStopPrice="{:.{}f}".format(sl_price, decimals),
-            belowPrice="{:.{}f}".format(sl_limit, decimals),
-            belowTimeInForce="GTC"
-        )
-        return {
-            "status": "success",
-            "buy_price": filled_price,
-            "qty": sell_qty,
-            "take_profit": tp_price,
-            "stop_loss": sl_price,
-            "oco_status": oco["listOrderStatus"]
-        }
+        try:
+            oco = client.create_oco_order(
+                symbol=symbol+"USDT",
+                side="SELL",
+                quantity="{:.8f}".format(sell_qty),
+                aboveType="LIMIT_MAKER",
+                abovePrice="{:.{}f}".format(tp_price, decimals),
+                belowType="STOP_LOSS_LIMIT",
+                belowStopPrice="{:.{}f}".format(sl_price, decimals),
+                belowPrice="{:.{}f}".format(sl_limit, decimals),
+                belowTimeInForce="GTC"
+            )
+            return {
+                "status": "success",
+                "buy_price": filled_price,
+                "qty": sell_qty,
+                "take_profit": tp_price,
+                "stop_loss": sl_price,
+                "oco_status": oco["listOrderStatus"]
+            }
+        except Exception as oco_error:
+            send_telegram(
+                "WARNING: BUY placed but OCO FAILED!\n"
+                "Coin: " + symbol + "\n"
+                "Qty: " + str(sell_qty) + "\n"
+                "Buy Price: $" + str(round(filled_price,6)) + "\n"
+                "OCO Error: " + str(oco_error) + "\n"
+                "ACTION REQUIRED: Place OCO manually!"
+            )
+            return {
+                "status": "buy_only",
+                "buy_price": filled_price,
+                "qty": sell_qty,
+                "oco_error": str(oco_error)  }
     except Exception as e:
         return {"status": "error", "reason": str(e)}
 
