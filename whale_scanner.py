@@ -179,7 +179,7 @@ async def main():
         send_telegram("USDT balance too low for whale trades.")
         return
     
-    for coin in coins[:3]:
+    for coin in coins[:1]:
         symbol = coin["symbol"]
         print(f"Analyzing {symbol}...")
         
