@@ -5,7 +5,6 @@ import json
 from datetime import datetime
 from binance.client import Client
 import math
-import numpy as np
 
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
