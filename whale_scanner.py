@@ -62,9 +62,9 @@ def get_whale_coins():
                 continue
             volume_to_mcap = volume / market_cap
             if (volume_to_mcap > 0.15 and
-                price_change > 2 and
-                volume > 50000000 and
-                symbol in HALAL_COINS):
+    0 < price_change < 8 and
+    volume > 10000000 and
+    symbol in HALAL_COINS):
                 whale_candidates.append({
                     "symbol": symbol,
                     "name": name,
