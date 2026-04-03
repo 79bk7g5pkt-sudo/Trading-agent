@@ -78,6 +78,28 @@ Positions: {json.dumps(portfolio.get('positions',{}))}
 --- TRADES ---
 {self._format_trade_history()}
 """
+    async def analyze_and_decide(self, market_data):
+        rsi = market_data.get("indicators", {}).get("rsi", 50)
+        price = market_data.get("price", 0)
+        symbol = market_data.get("symbol", "UNKNOWN")
+        
+        # Pre-filter: only call Claude when RSI is extreme
+        if 35 <= rsi <= 65:
+            print(f"RSI {rsi} is neutral - skipping Claude call (saving credits)")
+            send_telegram("RSI " + str(round(rsi,1)) + " neutral - HOLD (no Claude call)")
+            return {
+                "action": "HOLD",
+                "confidence": 45,
+                "reasoning": "RSI neutral - automatic HOLD without Claude analysis",
+                "stop_loss": 0,
+                "take_profit": 0,
+                "risk_level": "LOW",
+                "position_size_pct": 5,
+                "whale_impact": "N/A",
+                "news_impact": "N/A",
+                "symbol": symbol,
+                "mode": self.mode
+            }
 
     async def analyze_and_decide(self, market_data):
         context = self.build_market_context(market_data)
