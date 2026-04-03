@@ -5,10 +5,24 @@ import json
 from datetime import datetime
 from binance.client import Client
 import math
-from core.agent import ClaudeTradingAgent
 
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
+
+HALAL_COINS = [
+    "BTC","ETH","BNB","SOL","ADA","DOT","AVAX","ATOM","ALGO","NEAR",
+    "FTM","ONE","EGLD","ROSE","HBAR","XDC","IOTA","QTUM","WAVES","ICX",
+    "ZIL","ONT","NEO","VET","EOS","TRX","XTZ","THETA","FIL","ICP",
+    "XRP","XLM","NANO","BCH","LTC","DASH",
+    "LINK","GRT","BAT","ZRX","ENJ","MANA","SAND","AXS","GALA","IMX",
+    "CHZ","FLOW","AUDIO","LRC","SKL","STORJ","OCEAN","ANKR","CKB","RVN",
+    "DGB","ARDR","STEEM","HIVE",
+    "UNI","SUSHI","CRV","SNX","YFI","COMP","MKR","AAVE","1INCH",
+    "MATIC","OP","ARB","BOBA","CELR",
+    "SLP","ALICE","TLM","HERO","SKILL","TOWER",
+    "FET","NMR","AGIX","RNDR",
+    "WAN","ARPA","CTSI","BAND","API3","UMA","BAL","PERP"
+]
 
 def send_telegram(message):
     if not TOKEN or not CHAT_ID:
@@ -50,7 +64,7 @@ def get_whale_coins():
             if (volume_to_mcap > 0.15 and
                 price_change > 2 and
                 volume > 50000000 and
-                symbol not in ["USDT","USDC","BUSD","DAI","TUSD"]):
+                symbol in HALAL_COINS):
                 whale_candidates.append({
                     "symbol": symbol,
                     "name": name,
@@ -91,8 +105,8 @@ Volume/MCap Ratio: {coin['volume_to_mcap']} (high = whale activity)
 24h Price Change: {coin['price_change_24h']}%
 
 High volume relative to market cap suggests large players are accumulating.
+Should we BUY this coin expecting significant increase?
 
-Should we BUY this coin expecting 50%+ increase?
 Return ONLY JSON:
 {{
     "action": "BUY" or "SKIP",
@@ -157,67 +171,68 @@ def place_buy_with_oco(symbol, usdt_amount, take_profit_pct, stop_loss_pct):
 
 async def main():
     print(f"\nWhale Scanner - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    send_telegram("WHALE SCANNER STARTING\nScanning top 50 coins for whale activity...")
-    
+    send_telegram("WHALE SCANNER STARTING\nScanning for halal coins with whale activity...")
+
     coins = get_whale_coins()
-    
+
     if not coins:
-        send_telegram("No whale activity detected today.")
+        send_telegram("No halal whale activity detected today.")
         return
-    
-    report = "WHALE ACTIVITY REPORT\n"
-    report += "Top coins with unusual volume:\n\n"
+
+    report = "WHALE ACTIVITY REPORT\nTop halal coins with unusual volume:\n\n"
     for coin in coins:
         report += coin["symbol"] + ": +" + str(round(coin["price_change_24h"],1)) + "% | Vol/MCap: " + str(coin["volume_to_mcap"]) + "\n"
     send_telegram(report)
-    
+
     client = Client(os.environ.get("BINANCE_API_KEY"), os.environ.get("BINANCE_SECRET_KEY"))
     usdt = float(client.get_asset_balance(asset="USDT")["free"])
     trade_amount = round(usdt * 0.10, 2)
-    
+
     if trade_amount < 10:
         send_telegram("USDT balance too low for whale trades.")
         return
-    
-    for coin in coins[:1]:
-        symbol = coin["symbol"]
-        print(f"Analyzing {symbol}...")
-        
-        if not check_binance_available(symbol):
-            print(f"{symbol} not available on Binance - skipping")
-            continue
-        
-        analysis = await analyze_whale_coin(coin)
-        action = analysis.get("action", "SKIP")
-        confidence = analysis.get("confidence", 0)
-        reasoning = analysis.get("reasoning", "")
-        tp_pct = analysis.get("take_profit_pct", 20)
-        sl_pct = analysis.get("stop_loss_pct", 10)
-        
-        msg = "WHALE COIN: " + symbol + "\n"
-        msg += "Action: " + action + "\n"
-        msg += "Confidence: " + str(confidence) + "%\n"
-        msg += "Take Profit: +" + str(tp_pct) + "%\n"
-        msg += "Stop Loss: -" + str(sl_pct) + "%\n"
-        msg += "Reason: " + reasoning[:200]
-        send_telegram(msg)
-        
-        if action == "BUY" and confidence >= 60:
-            print(f"Buying {symbol}...")
-            result = place_buy_with_oco(symbol, trade_amount, tp_pct, sl_pct)
-            if result["status"] == "success":
-                send_telegram(
-                    "WHALE BUY EXECUTED\n"
-                    "Coin: " + symbol + "\n"
-                    "Amount: $" + str(trade_amount) + "\n"
-                    "Buy Price: $" + str(round(result["buy_price"],4)) + "\n"
-                    "Take Profit: $" + str(result["take_profit"]) + "\n"
-                    "Stop Loss: $" + str(result["stop_loss"]) + "\n"
-                    "OCO: " + result["oco_status"]
-                )
-            else:
-                send_telegram("Buy failed: " + result.get("reason","unknown"))
-    
+
+    coin = coins[0]
+    symbol = coin["symbol"]
+    print(f"Analyzing top halal whale coin: {symbol}")
+
+    if not check_binance_available(symbol):
+        send_telegram(symbol + " not available on Binance - skipping")
+        return
+
+    analysis = await analyze_whale_coin(coin)
+    action = analysis.get("action", "SKIP")
+    confidence = analysis.get("confidence", 0)
+    reasoning = analysis.get("reasoning", "")
+    tp_pct = analysis.get("take_profit_pct", 20)
+    sl_pct = analysis.get("stop_loss_pct", 10)
+
+    msg = "WHALE COIN ANALYSIS: " + symbol + "\n"
+    msg += "Action: " + action + "\n"
+    msg += "Confidence: " + str(confidence) + "%\n"
+    msg += "Take Profit: +" + str(tp_pct) + "%\n"
+    msg += "Stop Loss: -" + str(sl_pct) + "%\n"
+    msg += "Reason: " + reasoning[:200]
+    send_telegram(msg)
+
+    if action == "BUY" and confidence >= 60:
+        print(f"Buying {symbol}...")
+        result = place_buy_with_oco(symbol, trade_amount, tp_pct, sl_pct)
+        if result["status"] == "success":
+            send_telegram(
+                "WHALE BUY EXECUTED\n"
+                "Coin: " + symbol + "\n"
+                "Amount: $" + str(trade_amount) + "\n"
+                "Buy Price: $" + str(round(result["buy_price"],4)) + "\n"
+                "Take Profit: $" + str(result["take_profit"]) + "\n"
+                "Stop Loss: $" + str(result["stop_loss"]) + "\n"
+                "OCO: " + result["oco_status"]
+            )
+        else:
+            send_telegram("Buy failed: " + result.get("reason","unknown"))
+    else:
+        send_telegram("No trade today - " + action + " (" + str(confidence) + "% confidence)")
+
     send_telegram("Whale scan complete!")
 
 if __name__ == "__main__":
