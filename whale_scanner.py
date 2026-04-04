@@ -191,7 +191,9 @@ def place_buy_with_oco(symbol, usdt_amount, take_profit_pct, stop_loss_pct):
             oco = client.create_oco_order(
                 symbol=symbol+"USDT",
                 side="SELL",
-                quantity="{:.8f}".format(sell_qty),
+                quantity=str(math.floor(sell_qty)) if step >= 1 else "{:.8f}".format(sell_qty),
+
+
                 aboveType="LIMIT_MAKER",
                 abovePrice="{:.{}f}".format(tp_price, decimals),
                 belowType="STOP_LOSS_LIMIT",
