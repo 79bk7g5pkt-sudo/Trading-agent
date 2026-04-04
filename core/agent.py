@@ -229,3 +229,13 @@ Rules: Max 10% risk. BUY only if confidence>=65. SELL only if confidence>=60. Re
 
     def get_portfolio_summary(self):
         return {"mode": self.mode, "usdt_balance": self.portfolio["USDT"], "positions": self.portfolio["positions"], "total_trades": len(self.trade_log), "trade_log": self.trade_log[-10:]}
+
+    def execute_decision(self, decision, market_data):
+        action = decision.get("action","HOLD")
+        symbol = decision.get("symbol","BTC/USDT")
+        price = market_data.get("price",0)
+        if action == "HOLD":
+            return {"status": "no_trade"}
+        if self.mode == "paper":
+            return self._paper_trade(decision, price, symbol)
+        return self._live_trade(decision, price, symbol)
