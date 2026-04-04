@@ -161,7 +161,7 @@ def handle_command(text):
             agent.set_mode("paper")
         send_telegram("Switched to PAPER mode")
 
-        elif text == "/portfolio":
+    elif text == "/portfolio":
         if agent:
             p = agent.get_portfolio_summary()
             send_telegram(
