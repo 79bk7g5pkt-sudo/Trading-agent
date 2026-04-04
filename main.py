@@ -244,6 +244,7 @@ async def run(symbol="BTCUSDT", interval="15m", mode="paper", max_cycles=None):
         listener.start()
 
 
+
     send_telegram(
         "Bot started\n"
         "Symbol: " + symbol + "\n"
