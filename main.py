@@ -189,7 +189,7 @@ def handle_command(text):
         except Exception as e:
             send_telegram("PnL error: " + str(e))
 
-            )
+    
         else:
             send_telegram("Agent not started yet")
 
@@ -240,8 +240,9 @@ async def run(symbol="BTCUSDT", interval="15m", mode="paper", max_cycles=None):
     intervals = {"1m": 60, "5m": 300, "15m": 900, "1h": 3600, "4h": 14400}
     wait = intervals.get(interval, 900)
     if not max_cycles:
-    listener = threading.Thread(target=telegram_listener, daemon=True)
-    listener.start()
+        listener = threading.Thread(target=telegram_listener, daemon=True)
+        listener.start()
+
 
     send_telegram(
         "Bot started\n"
