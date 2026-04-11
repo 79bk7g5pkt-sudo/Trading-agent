@@ -197,23 +197,29 @@ Rules: Max 10% risk. BUY only if confidence>=65. SELL only if confidence>=60. Re
                         "note": "Buy placed but OCO failed"
                     }
 
-            elif action == "SELL":
+                        elif action == "SELL":
+                confidence = decision.get("confidence", 0)
                 asset = sym.replace("USDT", "")
-                qty = float(client.get_asset_balance(asset=asset)["free"])
-                if qty <= 0:
-                    return {"status": "skipped", "reason": "No "+asset+" to sell"}
-                info = client.get_symbol_info(sym)
-                lot = next(f for f in info["filters"] if f["filterType"] == "LOT_SIZE")
-                step = float(lot["stepSize"])
-                sell_qty = float("{:.8f}".format(math.floor(qty / step) * step))
-                if sell_qty <= 0:
-                    return {"status": "skipped", "reason": "Qty too small"}
-                order = client.order_market_sell(symbol=sym, quantity=sell_qty)
-                return {"status": "executed_live", "action": "SELL", "qty": sell_qty, "order_id": order["orderId"]}
+                if confidence > 75:
+                    open_orders = client.get_open_orders(symbol=sym)
+                    for order in open_orders:
+                        client.cancel_order(symbol=sym, orderId=order["orderId"])
+                    import time
+                    time.sleep(1)
+                    qty = float(client.get_asset_balance(asset=asset)["free"])
+                    if qty <= 0:
+                        return {"status": "skipped", "reason": "No "+asset+" to sell"}
+                    info = client.get_symbol_info(sym)
+                    lot = next(f for f in info["filters"] if f["filterType"] == "LOT_SIZE")
+                    step = float(lot["stepSize"])
+                    sell_qty = float("{:.8f}".format(math.floor(qty / step) * step))
+                    if sell_qty <= 0:
+                        return {"status": "skipped", "reason": "Qty too small"}
+                    order = client.order_market_sell(symbol=sym, quantity=sell_qty)
+                    return {"status": "executed_live", "action": "SELL", "qty": sell_qty, "order_id": order["orderId"]}
+                else:
+                    return {"status": "skipped", "reason": "SELL confidence "+str(confidence)+"% below 75% threshold - OCO managing exit"}
 
-            return {"status": "no_trade"}
-        except Exception as e:
-            return {"status": "error", "reason": str(e)}
 
 
 
