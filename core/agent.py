@@ -130,6 +130,13 @@ Rules: Max 10% risk. BUY only if confidence>=65. SELL only if confidence>=60. Re
             usdt = float(client.get_asset_balance(asset="USDT")["free"])
             self.portfolio["USDT"] = usdt
 
+            existing_orders = client.get_open_orders(symbol=sym)
+            asset_check = sym.replace("USDT","")
+            asset_qty = float(client.get_asset_balance(asset=asset_check)["free"])
+            asset_val = asset_qty * float(client.get_ticker(symbol=sym)["lastPrice"])
+            if action == "BUY" and (len(existing_orders) > 0 or asset_val > 10):
+                return {"status": "skipped", "reason": "Already have position in "+sym}
+
             if action == "BUY":
                 amount = round(usdt * size_pct, 2)
                 if amount < 10:
