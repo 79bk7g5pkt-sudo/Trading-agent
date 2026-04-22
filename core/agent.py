@@ -130,12 +130,6 @@ Rules: Max 10% risk. BUY only if confidence>=65. SELL only if confidence>=60. Re
             usdt = float(client.get_asset_balance(asset="USDT")["free"])
             self.portfolio["USDT"] = usdt
 
-            existing_orders = client.get_open_orders(symbol=sym)
-            asset_check = sym.replace("USDT","")
-            asset_qty = float(client.get_asset_balance(asset=asset_check)["free"])
-            asset_val = asset_qty * float(client.get_ticker(symbol=sym)["lastPrice"])
-            if action == "BUY" and (len(existing_orders) > 0 or asset_val > 10):
-                return {"status": "skipped", "reason": "Already have position in "+sym}
 
             if action == "BUY":
                 amount = round(usdt * size_pct, 2)
@@ -160,7 +154,7 @@ Rules: Max 10% risk. BUY only if confidence>=65. SELL only if confidence>=60. Re
                 sl_price = round_price(stop_loss, tick)
                 sl_limit = round_price(stop_limit, tick)
                 try:
-                    oco = client.create_oco_order(symbol=sym,side="SELL",quantity="{:.4f}".format(sell_qty),aboveType="LIMIT_MAKER",abovePrice="{:.2f}".format(tp_price),belowType="STOP_LOSS_LIMIT",belowStopPrice="{:.2f}".format(sl_price),belowPrice="{:.2f}".format(sl_limit),belowTimeInForce="GTC")
+                    oco = client.create_oco_order(symbol=sym,side="SELL",quantity=str(int(sell_qty)) if step >= 1 else "{:.8f}".format(sell_qty),aboveType="LIMIT_MAKER",abovePrice="{:.2f}".format(tp_price),belowType="STOP_LOSS_LIMIT",belowStopPrice="{:.2f}".format(sl_price),belowPrice="{:.2f}".format(sl_limit),belowTimeInForce="GTC")
                     return {
                         "status": "executed_live",
                         "action": "BUY",
