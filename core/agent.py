@@ -154,6 +154,15 @@ Rules: Max 10% risk. BUY only if confidence>=65. SELL only if confidence>=60. Re
                 sl_price = round_price(stop_loss, tick)
                 sl_limit = round_price(stop_limit, tick)
                 decimals = len(str(tick).rstrip("0").split(".")[-1])
+                for o in client.get_open_orders(symbol=sym):
+                    try:
+                        client.cancel_order(symbol=sym,orderId=o["orderId"])
+                    except:
+                        pass
+                __import__("time").sleep(1)
+                asset=sym.replace("USDT","")
+                total_qty=float(client.get_asset_balance(asset=asset)["free"])
+                sell_qty=float("{:.8f}".format(math.floor(total_qty/step)*step))
                 try:
                     oco = client.create_oco_order(symbol=sym,side="SELL",quantity=str(int(sell_qty)) if step >= 1 else "{:.8f}".format(sell_qty),aboveType="LIMIT_MAKER",abovePrice="{:.{}f}".format(tp_price,decimals),belowType="STOP_LOSS_LIMIT",belowStopPrice="{:.{}f}".format(sl_price,decimals),belowPrice="{:.{}f}".format(sl_limit,decimals),belowTimeInForce="GTC")
                     return {
