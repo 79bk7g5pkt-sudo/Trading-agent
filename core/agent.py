@@ -125,7 +125,7 @@ Rules: Max 10% risk. BUY only if confidence>=65. SELL only if confidence>=60. Re
             import math
             client = Client(os.environ.get("BINANCE_API_KEY"), os.environ.get("BINANCE_SECRET_KEY"))
             action = decision["action"]
-            size_pct = decision.get("position_size_pct", 5) / 100
+            size_pct = decision.get("position_size_pct", 25) / 100
             sym = symbol.replace("/", "")
             usdt = float(client.get_asset_balance(asset="USDT")["free"])
             self.portfolio["USDT"] = usdt
@@ -207,7 +207,7 @@ Rules: Max 10% risk. BUY only if confidence>=65. SELL only if confidence>=60. Re
 
     def _paper_trade(self, decision, price, symbol):
         action = decision["action"]
-        size_pct = decision.get("position_size_pct", 5) / 100
+        size_pct = decision.get("position_size_pct", 25) / 100
         base = symbol.replace("/USDT","")
         if action == "BUY":
             spend = self.portfolio["USDT"] * size_pct
