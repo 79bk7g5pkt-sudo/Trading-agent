@@ -96,7 +96,15 @@ Analyze the data and return ONLY a JSON object:
   "risk_level": "LOW or MEDIUM or HIGH",
   "time_horizon": "2-4 hours"
 }
-Rules: Max 10% risk. BUY only if confidence>=65. SELL only if confidence>=60. Return ONLY JSON."""
+Rules:
+1. BUY only if confidence>=75 AND RSI<45 AND trend is UP
+2. SELL only if confidence>=75 OR RSI>70
+3. HOLD if market uncertain or BTC dominance dropping
+4. Take profit target: 8-15% minimum
+5. Stop loss: 5% maximum
+6. Never buy if RSI>60
+7. Prefer coins with strong volume and upward momentum
+8. Return ONLY JSON."""
         self.conversation_history.append({"role": "user", "content": f"{context}\nYour decision?"})
         response = self.client.messages.create(
             model=self.model,
