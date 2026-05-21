@@ -133,7 +133,7 @@ Rules:
             import math
             client = Client(os.environ.get("BINANCE_API_KEY"), os.environ.get("BINANCE_SECRET_KEY"))
             action = decision["action"]
-            size_pct = 0.25
+            size_pct = 0.15
             sym = symbol.replace("/", "")
             usdt = float(client.get_asset_balance(asset="USDT")["free"])
             self.portfolio["USDT"] = usdt
@@ -143,6 +143,9 @@ Rules:
                 amount = round(usdt * size_pct, 2)
                 if amount < 10:
                     return {"status": "skipped", "reason": "Balance too low"}
+                rsi = market_data.get("rsi", 50) if hasattr(self, "_last_market_data") else 50
+                if rsi > 50:
+                    return {"status": "skipped", "reason": "RSI too high: "+str(rsi)}
                 buy_order = client.order_market_buy(symbol=sym, quoteOrderQty=amount)
                 filled_qty = float(buy_order["executedQty"])
                 filled_price = float(buy_order["cummulativeQuoteQty"]) / filled_qty
@@ -215,7 +218,7 @@ Rules:
 
     def _paper_trade(self, decision, price, symbol):
         action = decision["action"]
-        size_pct = 0.25
+        size_pct = 0.15
         base = symbol.replace("/USDT","")
         if action == "BUY":
             spend = self.portfolio["USDT"] * size_pct
